@@ -39,7 +39,7 @@
 # define PRIVDROP_CHROOT_DIR	"/var/empty"
 #endif
 /*
- * Capture length for libpcap: Must fit the link layer header, plus 
+ * Capture length for libpcap: Must fit the link layer header, plus
  * a maximally sized ip/ipv6 header and most of a TCP header
  */
 #define LIBPCAP_SNAPLEN_V4		96
@@ -58,7 +58,7 @@
 #define DEFAULT_EXPIRY_INTERVAL		60
 
 /*
- * Default maximum number of flow to track simultaneously 
+ * Default maximum number of flow to track simultaneously
  * 8192 corresponds to just under 1Mb of flow data
  */
 #define DEFAULT_MAX_FLOWS	8192
@@ -101,7 +101,7 @@ struct FLOWTRACKPARAMETERS {
 	int icmp_timeout;			/* ICMP flows */
 	int general_timeout;			/* Everything else */
 	int maximum_lifetime;			/* Maximum life for flows */
-	int expiry_interval;			/* Interval between expiries */ 
+	int expiry_interval;			/* Interval between expiries */
 
 	/* Statistics */
 	u_int64_t total_packets;		/* # of good packets */
@@ -159,8 +159,8 @@ struct FLOWTRACK {
 };
 
 /*
- * This structure is an entry in the tree of flows that we are 
- * currently tracking. 
+ * This structure is an entry in the tree of flows that we are
+ * currently tracking.
  *
  * Because flows are matched _bi-directionally_, they must be stored in
  * a canonical format: the numerically lowest address and port number must
@@ -188,33 +188,41 @@ struct FLOW {
 		struct in6_addr v6;
 	} addr[2];				/* Endpoint addresses */
 	u_int16_t port[2];			/* Endpoint ports */
-	u_int8_t tcp_flags[2];			/* Cumulative OR of flags */
+
+        u_int8_t tcp_flags[2];			/* Cumulative OR of flags */
+
+        u_int16_t tcp_ack_nb[2];                 /* Number of tcp ACK set */
+        u_int16_t tcp_push_nb[2];                /* Number of tco PUSH set */
+        u_int16_t tcp_reset_nb[2];               /* Number of tcp RESET set */
+        u_int16_t tcp_syn_nb[2];                 /* Number of tcp SYN set */
+        u_int16_t tcp_fin_nb[2];                 /* Number of tcp FIN set */
+
 	u_int8_t tos[2];			/* Tos */
         u_int16_t vlanid;                       /* vlanid */
 	u_int8_t protocol;			/* Protocol */
 };
 
 /*
- * This is an entry in the tree of expiry events. The tree is used to 
+ * This is an entry in the tree of expiry events. The tree is used to
  * avoid traversion the whole tree of active flows looking for ones to
  * expire. "expires_at" is the time at which the flow should be discarded,
- * or zero if it is scheduled for immediate disposal. 
+ * or zero if it is scheduled for immediate disposal.
  *
- * When a flow which hasn't been scheduled for immediate expiry registers 
- * traffic, it is deleted from its current position in the tree and 
+ * When a flow which hasn't been scheduled for immediate expiry registers
+ * traffic, it is deleted from its current position in the tree and
  * re-inserted (subject to its updated timeout).
  *
  * Expiry scans operate by starting at the head of the tree and expiring
  * each entry with expires_at < now
- * 
+ *
  */
 struct EXPIRY {
 	EXPIRY_ENTRY(EXPIRY) trp;		/* Tree pointer */
 	struct FLOW *flow;			/* pointer to flow */
 
 	u_int32_t expires_at;			/* time_t */
-	enum { 
-		R_GENERAL, R_TCP, R_TCP_RST, R_TCP_FIN, R_UDP, R_ICMP, 
+	enum {
+		R_GENERAL, R_TCP, R_TCP_RST, R_TCP_FIN, R_UDP, R_ICMP,
 		R_MAXLIFE, R_OVERBYTES, R_OVERFLOWS, R_FLUSH
 	} reason;
 };
@@ -223,22 +231,42 @@ struct EXPIRY {
 u_int32_t timeval_sub_ms(const struct timeval *t1, const struct timeval *t2);
 
 /* Prototypes for functions to send NetFlow packets, from netflow*.c */
-int send_netflow_v1(struct FLOW **flows, int num_flows, int nfsock,
-		    u_int16_t ifidx, struct FLOWTRACKPARAMETERS *param,
+int send_netflow_v1(struct FLOW **flows,
+                    int num_flows,
+                    int nfsock,
+		    u_int16_t ifidx,
+                    struct FLOWTRACKPARAMETERS *param,
 		    int verbose_flag);
-int send_netflow_v5(struct FLOW **flows, int num_flows, int nfsock,
-		    u_int16_t ifidx, struct FLOWTRACKPARAMETERS *param,
+
+int send_netflow_v5(struct FLOW **flows,
+                    int num_flows,
+                    int nfsock,
+		    u_int16_t ifidx,
+                    struct FLOWTRACKPARAMETERS *param,
 		    int verbose_flag);
-int send_netflow_v9(struct FLOW **flows, int num_flows, int nfsock,
-		    u_int16_t ifidx, struct FLOWTRACKPARAMETERS *param,
+
+int send_netflow_v9(struct FLOW **flows,
+                    int num_flows,
+                    int nfsock,
+		    u_int16_t ifidx,
+                    struct FLOWTRACKPARAMETERS *param,
 		    int verbose_flag);
-int send_ipfix(struct FLOW **flows, int num_flows, int nfsock,
-	       u_int16_t ifidx, struct FLOWTRACKPARAMETERS *param,
-	       int verbose_flag);
-int send_ipfix_bidirection(struct FLOW **flows, int num_flows, int nfsock,
-			   u_int16_t ifidx, 
-			   struct FLOWTRACKPARAMETERS *param,
-			   int verbose_flag);
+
+void nf9_init_template(char *str_template);
+
+int send_ipfix(     struct FLOW **flows,
+                    int num_flows,
+                    int nfsock,
+	            u_int16_t ifidx,
+                    struct FLOWTRACKPARAMETERS *param,
+	            int verbose_flag);
+
+int send_ipfix_bidirection( struct FLOW **flows,
+                            int num_flows,
+                            int nfsock,
+			    u_int16_t ifidx,
+			    struct FLOWTRACKPARAMETERS *param,
+			    int verbose_flag);
 
 /* Force a resend of the flow template */
 void netflow9_resend_template(void);

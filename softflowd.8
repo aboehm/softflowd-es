@@ -31,7 +31,7 @@
 .Nm softflowd
 .Op Fl 6dDh
 .Op Fl L Ar hoplimit
-.Op Fl T Ar track_level
+.Op Fl l Ar track_level
 .Op Fl c Ar ctl_sock
 .Bk -words
 .Oo Fl i\ \&
@@ -105,6 +105,7 @@ These records are sent to the specified
 and
 .Ar port .
 The host may represent a unicast host or a multicast group.
+.Sh OPTIONS
 .Pp
 The command-line options are as follows:
 .Bl -tag -width Ds
@@ -209,7 +210,7 @@ Set the IPv4 TTL or the IPv6 hop limit to
 will use the default system TTL when exporting flows to a unicast host.
 When exporting to a multicast group, the default TTL will be 1
 (i.e. link-local).
-.It Fl T Ar track_level
+.It Fl l Ar track_level
 Specify which flow elements
 .Nm
 should be used to define a flow.
@@ -328,6 +329,93 @@ Time format examples:
 .It 1h30m
 1 hour 30 minutes (90 minutes)
 .El
+
+.Ss Templates
+.Pp
+When exporting with netflow v9, the Fl T option allows you to define a custom netflow template. Note that
+.Nm
+does not export all fields proposed by CISCO in RFC 3954. Here are the available fields:
+
+.Bl -tag -width 22n
+.It %IN_BYTES
+input bytes count.
+.It %IN_PKTS
+input packets count.
+.It %PROTOCOL
+IP protocol field.
+.It %TOS
+IP TOS (type of service) field.
+.It %TCP_FLAGS
+cumulative OR of tcp flags.
+.It %L4_SRC_PORT
+layer 4 (UDP/TCP) source port.
+.It %IPV4_SRC_ADDR
+IPv4 source address.
+.It %SRC_MASK
+number of contiguous bits in the source subnet mask (i.e., the mask in slash notation)
+.It %INPUT_SNMP
+input interface SNMP id.
+.It %L4_DST_PORT
+layer 4 (UDP/TCP) destination port.
+.It %IPV4_DST_ADDR
+IPv4 destination address.
+.It %DST_MASK
+number of contiguous bits in the destination subnet mask (i.e., the mask in slash notation)
+.It %OUTPUT_SNMP
+output interface SNMP id.
+.It %SRC_AS
+source AS.
+.It %DST_AS
+destination AS.
+.It %LAST_SWITCHED
+sysUptime in msec at which the last packet of this Flow was switched.
+.It %FIRST_SWITCHED
+sysUptime in msec at which the first packet of this Flow was switched.
+.It %OUT_BYTES
+output bytes count.
+.It %OUT_PKTS
+output packets count.
+.It %IPV6_SRC_ADDR
+IPv6 source address.
+.It %IPV6_DST_ADDR
+IPv6 destination address.
+.It %IPV6_SRC_MASK
+number of contiguous bits in the source IPv6 subnet mask (i.e., the mask in slash notation)
+.It %IPV6_DST_MASK
+number of contiguous bits in the destination IPv6 subnet mask (i.e., the mask in slash notation)
+.It %IPV6_FLOW_LABEL
+IPv6 flow label.
+.It %ICMP_TYPE
+Internet Control Message Protocol (ICMP) packet type; reported as ICMP Type * 256 + ICMP code
+.It %SAMPLING_INTERVAL
+.It %SAMPLING_ALGORITHM
+.It %FLOW_ACTIVE_TIMEOUT
+.It %FLOW_INACTIVE_TIMEOUT
+.It %TOTAL_BYTES_EXP
+total number of bytes exported.
+.It %TOTAL_PKTS_EXP
+total number of packets exported.
+.It %TOTAL_FLOWS_EXP
+total number of flows.
+.It %DST_TOS
+type of Service byte setting when exiting outgoing interface.
+.It %SRC_MAC
+source MAC address.
+.It %DST_MAC
+destination MAC address.
+.It %SRC_VLAN
+source VLAN.
+.It %DST_VLAN
+destination VLAN.
+.It %IP_PROTOCOL_VERSION
+IP protocol version.
+.It %DIRECTION
+flow direction (always 0).
+.It %IPV6_OPTION_HEADERS
+bit-encoded field identifying IPv6 option headers found in the flow
+.El
+
+
 .Ss Run-time Control
 .Pp
 A daemonised
