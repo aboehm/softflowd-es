@@ -12,8 +12,11 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-AC_INIT
+AC_PREREQ(2.13)
+AC_INIT([softflowd],[0.9.9])
 AC_CONFIG_SRCDIR([softflowd.c])
+
+AC_CONFIG_MACRO_DIR([m4])
 
 AC_CONFIG_HEADER(config.h)
 AC_PROG_CC
@@ -31,11 +34,6 @@ AC_ARG_ENABLE(gcc-warnings,
 	[  --enable-gcc-warnings   Enable verbose warnings (only for gcc)],
 	[ if test "x$enableval" = "xyes" ; then CFLAGS="$CFLAGS $WFLAGS"; fi ]
 )
-AC_ARG_ENABLE(nf9-vlan,
-              AC_HELP_STRING([--enable-nf9-vlan],
-                             [enable exporting VLAN (and ICMP_TYPE) field in NetFlow v9 (default is NO)]),
-              AC_DEFINE([ENABLE_NF9_VLAN], 1, [enable exporting VLAN (and ICMP_TYPE) field in NetFlow v9]))
-
 AC_ARG_WITH(cflags,
 	[  --with-cflags           Specify additional compiler flags],
 	[ if test "x$withval" != "xno" ; then CFLAGS="$CFLAGS $withval"; fi ]	
@@ -57,8 +55,24 @@ AC_ARG_WITH(chrootdir,
 	[ AC_DEFINE_UNQUOTED([PRIVDROP_CHROOT_DIR], ["${withval}"], [privdrop chroot directory]) ]	
 )
 
-AC_DEFINE([_BSD_SOURCE], [], [Define BSD SOURCE for Linux])
-AC_CHECK_HEADERS(net/bpf.h pcap.h pcap-bpf.h sys/endian.h endian.h)
+AC_ARG_ENABLE(elasticsearch,
+	[AS_HELP_STRING([--enable-elasticsearch],[Enable elasticsearch output module @<:@default=no@:>@])],
+	[case "${enableval}" in
+		yes) enable_elasticsearch="yes" ;;
+		no) enable_elasticsearch="no" ;;
+		*) AC_MSG_ERROR(bad value ${enableval} for --enable-elasticsearch) ;;
+	esac],
+	[enable_elasticsearch=no]
+)
+AS_IF([test "x$enable_elasticsearch" = "xyes"], [
+	CFLAGS+=`pkg-config --cflags-only-I libcurl`
+	LDFLAGS+=`pkg-config --libs libcurl`
+	AC_CHECK_HEADERS(curl/curl.h)
+	AC_DEFINE([USE_ELASTICSEARCH], [1], [Use elasticsearch as logging target])
+	AC_SUBST(ELASTICSEARCH_OBJS, [elasticsearch.o])
+])
+
+AC_CHECK_HEADERS(net/bpf.h pcap.h pcap-bpf.h)
 
 dnl AC_CHECK_HEADERS(netinet/in_systm.h netinet/tcp.h netinet/udp.h)
 dnl 
@@ -93,8 +107,7 @@ AC_SEARCH_LIBS(gethostbyname, nsl)
 AC_SEARCH_LIBS(socket, socket)
 AC_CHECK_LIB(pcap, pcap_open_live)
 
-AC_CHECK_FUNCS(closefrom daemon setresuid setreuid setresgid setgid strlcpy strlcat strsep)
-AC_CHECK_DECLS([htobe64, htonll])
+AC_CHECK_FUNCS(closefrom daemon setresuid setreuid setresgid setgid strlcpy strlcat)
 
 AC_CHECK_TYPES([u_int64_t, int64_t, uint64_t, u_int32_t, int32_t, uint32_t])
 AC_CHECK_TYPES([u_int16_t, int16_t, uint16_t, u_int8_t, int8_t, uint8_t])

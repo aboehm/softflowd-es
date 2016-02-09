@@ -53,6 +53,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef USE_ELASTICSEARCH
+#include "elasticsearch.h"
+struct ES_CON* elasticsearch = NULL;
+#endif
+
 /* Global variables */
 static int verbose_flag = 0;		/* Debugging flag */
 static u_int16_t if_index = 0;		/* "manual" interface index */
@@ -1577,6 +1582,9 @@ usage(void)
 "  -t timeout=time         Specify named timeout\n"
 "  -m max_flows            Specify maximum number of flows to track (default %d)\n"
 "  -n host:port            Send Cisco NetFlow(tm)-compatible packets to host:port\n"
+#ifdef USE_ELASTICSEARCH
+"  -e URL                  Send flows to elasticsearch node (index softflowd, type softflow)\n"
+#endif
 "  -p pidfile              Record pid in specified file\n"
 "                          (default: %s)\n"
 "  -c pidfile              Location of control socket\n"
@@ -1810,8 +1818,17 @@ main(int argc, char **argv)
 	dontfork_flag = 0;
 	always_v6 = 0;
 
+#if USE_ELASTICSEARCH
+	while ((ch = getopt(argc, argv, "6hdDL:l:i:r:f:t:n:m:p:c:v:T:s:P:A:e:b")) != -1) {
+#else
 	while ((ch = getopt(argc, argv, "6hdDL:l:i:r:f:t:n:m:p:c:v:T:s:P:A:b")) != -1) {
+#endif
 		switch (ch) {
+#ifdef USE_ELASTICSEARCH
+		case 'e':
+			elasticsearch = setup_elasticsearch(optarg, "softflowd", "softflow");
+			break;
+#endif
 		case '6':
 			always_v6 = 1;
 			break;
@@ -2156,6 +2173,10 @@ expiry_check:
 	unlink(pidfile_path);
 	if (ctlsock_path != NULL)
 		unlink(ctlsock_path);
+
+#ifdef USE_ELASTICSEARCH
+	cleanup_elasticsearch(elasticsearch);
+#endif
 
 	return(r == 0 ? 0 : 1);
 }

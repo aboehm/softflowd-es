@@ -190,3 +190,6 @@
 
 /* Define BSD SOURCE for Linux */
 #undef _BSD_SOURCE
+
+/* Define to add elasticsearch logging target support */
+#undef USE_ELASTICSEARCH
