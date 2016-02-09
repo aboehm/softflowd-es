@@ -690,6 +690,13 @@ process_packet( struct FLOWTRACK *ft,
 	if (flow->expiry->expires_at != 0)
 		flow_update_expiry(ft, flow);
 
+#ifdef USE_ELASTICSEARCH
+	if (elasticsearch) {
+		time_t now = time(NULL);
+		log2elasticserch(elasticsearch, flow, (long int)flow->expiry->expires_at - now < 0);
+	}
+#endif
+
 	return (PP_OK);
 }
 

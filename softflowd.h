@@ -177,8 +177,8 @@ struct FLOW {
 	struct timeval flow_last;		/* Time of last traffic */
 
 	/* Per-endpoint statistics (all in _host_ byte order) */
-	u_int32_t octets[2];			/* Octets so far */
-	u_int32_t packets[2];			/* Packets so far */
+	u_int64_t octets[2];			/* Octets so far */
+	u_int64_t packets[2];			/* Packets so far */
 
 	/* Flow identity (all are in network byte order) */
 	int af;					/* Address family of flow */
@@ -191,11 +191,11 @@ struct FLOW {
 
         u_int8_t tcp_flags[2];			/* Cumulative OR of flags */
 
-        u_int16_t tcp_ack_nb[2];                 /* Number of tcp ACK set */
-        u_int16_t tcp_push_nb[2];                /* Number of tco PUSH set */
-        u_int16_t tcp_reset_nb[2];               /* Number of tcp RESET set */
-        u_int16_t tcp_syn_nb[2];                 /* Number of tcp SYN set */
-        u_int16_t tcp_fin_nb[2];                 /* Number of tcp FIN set */
+        u_int64_t tcp_ack_nb[2];                 /* Number of tcp ACK set */
+        u_int64_t tcp_push_nb[2];                /* Number of tco PUSH set */
+        u_int64_t tcp_reset_nb[2];               /* Number of tcp RESET set */
+        u_int64_t tcp_syn_nb[2];                 /* Number of tcp SYN set */
+        u_int64_t tcp_fin_nb[2];                 /* Number of tcp FIN set */
 
 	u_int8_t tos[2];			/* Tos */
         u_int16_t vlanid;                       /* vlanid */

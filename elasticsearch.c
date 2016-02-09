@@ -1,106 +1,48 @@
+#include "common.h"
 #include "convtime.h"
 #include "softflowd.h"
 #include <sys/time.h>
 #include "elasticsearch.h"
 
-extern int verbose_flag;
+/* defined in softflowd.c to enable verbose output */
+int verbose_flag;
+
+/* Format a time */
+static const char *
+format_time_usec(struct timeval* t)
+{
+	struct tm *tm;
+	char buf[32];
+	static char ret[32];
+
+	tm = gmtime(&t->tv_sec);
+	strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", tm);
+	snprintf(ret, sizeof(ret), "%s.%06ld", buf, t->tv_usec);
+
+	return (ret);
+}
 
 /* Get a unique id from a flow  */ 
 static const char*
-flow_uid(struct FLOW* flow)
+flow_uid(struct FLOW* flow, int in_flow, struct timeval * now)
 {
-	static char buf[128];
-	char buf_time[64];
-	struct tm *tm;
+	static char ret[256];
 	char addr1[64], addr2[64];
 
 	inet_ntop(flow->af, &flow->addr[0], addr1, sizeof(addr1));
 	inet_ntop(flow->af, &flow->addr[1], addr2, sizeof(addr2));
 
-	tm = gmtime(&flow->flow_start.tv_sec);
-	strftime(buf_time, sizeof(buf_time),
-		"%Y%m%dT%H%M%S", tm);
-
-	snprintf(buf, sizeof(buf), "%s%05hu%s%05hu%s", 
-		addr1, ntohs(flow->port[0]),	
-		addr1, ntohs(flow->port[1]),
-		buf_time
+	snprintf(ret, sizeof(ret), "%"PRIu64"_%s_%s",
+		flow->flow_seq,
+		format_time_usec(now),
+		in_flow ? "in" : "out"
 	    );
 
-	return (buf);
+	return (ret);
 }
 
 static const char *
-format_flow_json(struct FLOW *flow, int expired)
-{
-	char addr1[64], addr2[64], stime[32], ftime[32], etime[32];
-	static char buf[MAX_LEN_FLOW_JSON];
-
-	inet_ntop(flow->af, &flow->addr[0], addr1, sizeof(addr1));
-	inet_ntop(flow->af, &flow->addr[1], addr2, sizeof(addr2));
-
-	snprintf(stime, sizeof(ftime), "%s", 
-	    format_time(flow->flow_start.tv_sec));
-	snprintf(ftime, sizeof(ftime), "%s", 
-	    format_time(flow->flow_last.tv_sec));
-
-	snprintf(buf, sizeof(buf),
-		"{"
-		" \"seq\":%"PRIu64" "
-		", \"type\": \"softflow\" "
-		", \"src_addr\": \"%s:%hu\" "
-		", \"src_ip\": \"%s\" "
-		", \"src_port\": %u "
-		", \"dst_addr\": \"%s:%hu\" "
-		", \"dst_ip\": \"%s\" "
-		", \"dst_port\": %u "
-		", \"proto\": %u "
-		", \"octets\": %u "
-		", \"packets\": %u "
-		", \"start\": \"%s.%03ld\" "
-		", \"finish\": \"%s.%03ld\" "
-		", \"tcp_flags\": \"%02x\" "
-		", \"flowlabel\": \"%08x\" "
-		", \"expired\": %s "
-		"}\n"
-		" \"seq\":%"PRIu64" "
-		", \"src_addr\": \"%s:%hu\" "
-		", \"dst_addr\": \"%s:%hu\" "
-		", \"proto\": %u "
-		", \"octets\": %u "
-		", \"packets\": %u "
-		", \"start\": \"%s.%03ld\" "
-		", \"finish\": \"%s.%03ld\" "
-		", \"tcp_flags\": \"%02x\" "
-		", \"flowlabel\": \"%08x\" "
-		", \"expired\": %s "
-		"}",
-		flow->flow_seq,
-		addr1, ntohs(flow->port[0]), addr1, ntohs(flow->port[0]),
-		addr2, ntohs(flow->port[1]), addr2, ntohs(flow->port[1]),
-		(int)flow->protocol, 
-		flow->octets[0], flow->packets[0], 
-		stime, (flow->flow_start.tv_usec + 500) / 1000, 
-		ftime, (flow->flow_last.tv_usec + 500) / 1000,
-		flow->tcp_flags[0],
-		flow->ip6_flowlabel[0],
-		expired ? "true" : "false",
-		flow->flow_seq,
-		addr1, ntohs(flow->port[0]), addr2, ntohs(flow->port[1]),
-		(int)flow->protocol, 
-		flow->octets[1], flow->packets[1], 
-		stime, (flow->flow_start.tv_usec + 500) / 1000, 
-		ftime, (flow->flow_last.tv_usec + 500) / 1000,
-		flow->tcp_flags[1],
-		flow->ip6_flowlabel[1],
-		expired ? "true" : "false"
-	);
-
-	return (buf);
-}
-
-static const char *
-proto2string(u_int8_t proto)
+proto2str(u_int8_t proto)
 {
 	static char buf[8];
 
@@ -136,23 +78,38 @@ proto2string(u_int8_t proto)
 }
 
 static const char *
+af2str(int family)
+{
+	static char buf[32];
+
+	switch (family) {
+	case AF_UNSPEC:		return "unspecified";
+	case AF_BRIDGE:		return "BRIDGE";
+	case AF_DECnet:		return "DECnet";
+	case AF_INET:		return "IP";
+	case AF_INET6:		return "IPv6";
+	case AF_IPX:		return "IPX";
+	case AF_X25:		return "X25";
+	case AF_AX25:		return "AX25";
+	case AF_ATMPVC:		return "ATMPVC";
+	case AF_APPLETALK:	return "AppleTALK";
+	default:		snprintf(buf, sizeof(buf), "UNKNOWN(%u)", family); break;
+	}
+
+	return buf;
+}
+
+static const char *
 format_flow_es_bulk(struct FLOW *flow, int expired, const char* es_index, const char* es_doc_type)
 {
-	char addr1[64], addr2[64], stime[32], ftime[32], etime[32], tstime[32];
-	static char buf[MAX_LEN_FLOW_JSON];
+	char addr1[64], addr2[64];
+	static char buf[MAX_LEN_ES_BULK];
 	struct timeval now;
 	
 	gettimeofday(&now, NULL);
 
 	inet_ntop(flow->af, &flow->addr[0], addr1, sizeof(addr1));
 	inet_ntop(flow->af, &flow->addr[1], addr2, sizeof(addr2));
-
-	snprintf(stime, sizeof(ftime), "%s", 
-		format_time(flow->flow_start.tv_sec));
-	snprintf(ftime, sizeof(ftime), "%s", 
-		format_time(flow->flow_last.tv_sec));
-	snprintf(tstime, sizeof(tstime), "%s.%03ld", 
-		format_time(now.tv_sec), now.tv_usec);
 
 	snprintf(buf, sizeof(buf),
 		"{ \"index\": { \"_index\" : \"%s\", \"_type\" : \"%s\", \"_id\": \"%s\" }\n"
@@ -165,11 +122,12 @@ format_flow_es_bulk(struct FLOW *flow, int expired, const char* es_index, const 
 		", \"proto\": \"%s\" "
 		", \"octets\": %u "
 		", \"packets\": %u "
-		", \"start\": \"%s.%03ld\" "
-		", \"finish\": \"%s.%03ld\" "
+		", \"start\": \"%s\" "
+		", \"finish\": \"%s\" "
 		", \"tcp_flags\": \"%02x\" "
 		", \"flowlabel\": \"%08x\" "
 		", \"expired\": %s "
+		", \"protocol_family\": \"%s\" "
 		"}\n"
 		"{ \"index\": { \"_index\" : \"%s\", \"_type\" : \"%s\", \"_id\": \"%s\" }\n"
 		"{"
@@ -180,46 +138,51 @@ format_flow_es_bulk(struct FLOW *flow, int expired, const char* es_index, const 
 		", \"proto\": \"%s\" "
 		", \"octets\": %u "
 		", \"packets\": %u "
-		", \"start\": \"%s.%03ld\" "
-		", \"finish\": \"%s.%03ld\" "
+		", \"start\": \"%s\" "
+		", \"finish\": \"%s\" "
 		", \"tcp_flags\": \"%02x\" "
 		", \"flowlabel\": \"%08x\" "
 		", \"expired\": %s "
+		", \"protocol_family\": \"%s\" "
 		"}",
-		es_index, es_doc_type, flow_uid(flow),
-		tstime,
+		es_index, es_doc_type, flow_uid(flow, 1, &now),
+		format_time_usec(&now),
 		flow->flow_seq,
 		addr1, ntohs(flow->port[0]), addr1, ntohs(flow->port[0]),
 		addr2, ntohs(flow->port[1]), addr2, ntohs(flow->port[1]),
-		proto2string(flow->protocol),
+		proto2str(flow->protocol),
 		flow->octets[0], flow->packets[0], 
-		stime, (flow->flow_start.tv_usec + 500) / 1000, 
-		ftime, (flow->flow_last.tv_usec + 500) / 1000,
+		format_time_usec(&flow->flow_start),
+		format_time_usec(&flow->flow_last),
 		flow->tcp_flags[0],
 		flow->ip6_flowlabel[0],
 		expired ? "true" : "false",
-		es_index, es_doc_type, flow_uid(flow),
-		tstime,
+		af2str(flow->af),
+		es_index, es_doc_type, flow_uid(flow, 0, &now),
+		format_time_usec(&now),
 		flow->flow_seq,
-		addr1, ntohs(flow->port[0]), addr1, ntohs(flow->port[0]),
 		addr2, ntohs(flow->port[1]), addr2, ntohs(flow->port[1]),
-		proto2string(flow->protocol),
+		addr1, ntohs(flow->port[0]), addr1, ntohs(flow->port[0]),
+		proto2str(flow->protocol),
 		flow->octets[1], flow->packets[1], 
-		stime, (flow->flow_start.tv_usec + 500) / 1000, 
-		ftime, (flow->flow_last.tv_usec + 500) / 1000,
+		format_time_usec(&flow->flow_start),
+		format_time_usec(&flow->flow_last),
 		flow->tcp_flags[1],
 		flow->ip6_flowlabel[1],
-		expired ? "true" : "false"
+		expired ? "true" : "false",
+		af2str(flow->af)
 	);
 
 	return (buf);
 }
 
-size_t es_write_callback_nothing(char *ptr, size_t size, size_t nmemb, void *userdata) {
+size_t es_write_callback_nothing(char *ptr, size_t size, size_t nmemb, void *userdata)
+{
 }
 
 struct ES_CON*
-setup_elasticsearch(const char* url, const char* index, const char* doc_type) {
+setup_elasticsearch(const char* url, const char* index, const char* doc_type)
+{
 	char es_url[1024];
 	struct ES_CON* con;
 
@@ -267,7 +230,7 @@ cleanup_elasticsearch(struct ES_CON* con) {
 	}
 }
 
-static int
+int
 log2elasticserch(struct ES_CON* con, struct FLOW *flow, int expired) {
 	const char* bulk = format_flow_es_bulk(flow, expired, con->index, con->doc_type);
 
@@ -278,27 +241,4 @@ log2elasticserch(struct ES_CON* con, struct FLOW *flow, int expired) {
 	curl_easy_perform(con->curl);
 
 	return 0;
-}
-
-static void
-dump_flows_es(struct FLOWTRACK *ft, struct ES_CON* es, FILE* out)
-{
-	struct EXPIRY *expiry;
-	time_t now;
-	long proceeded_flows = 0;
-
-	now = time(NULL);
-
-	EXPIRY_FOREACH(expiry, EXPIRIES, &ft->expiries) {
-		if (!log2elasticserch(es, expiry->flow, (long int) expiry->expires_at - now < 0))
-			proceeded_flows++;
-	}
-
-	if (es) {
-		fprintf(out, "%u flows to %s (index: %s) proceeded\n",
-			proceeded_flows, es->url, es->index);
-	} else {
-		fprintf(out, "no elasticsearch server specified\n");
-	}
-
 }

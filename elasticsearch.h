@@ -3,7 +3,7 @@
 
 #include <curl/curl.h>
 
-#define MAX_LEN_FLOW_JSON 4096
+#define MAX_LEN_ES_BULK 16*1024
 struct ES_CON {
 	CURL *curl;
 	char url[512];
@@ -12,7 +12,8 @@ struct ES_CON {
 	struct curl_slist *headers;
 };
 
-void cleanup_elasticsearch(struct ES_CON* con);
 struct ES_CON* setup_elasticsearch(const char* url, const char* index, const char* doc_type);
+int log2elasticserch(struct ES_CON* con, struct FLOW *flow, int expired);
+void cleanup_elasticsearch(struct ES_CON* con);
 
 #endif // __ELASTICSEARCH_H__
