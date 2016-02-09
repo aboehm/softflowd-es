@@ -1,0 +1,11 @@
+# autotools create that for us
+Makefile
+configure
+config.status
+autom4te.cache/*.*
+
+# no binaries
+*.o softflowd softflowctl
+
+# ignore vim files
+.*.swp
