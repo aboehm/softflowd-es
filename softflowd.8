@@ -43,6 +43,7 @@
 .Ek
 .Op Fl m Ar max_flows
 .Op Fl n Ar host:port
+.Op Fl e Ar http[s]://host:port
 .Op Fl p Ar pidfile
 .Op Fl r Ar pcap_file
 .Op Fl t Ar timeout_name=seconds
@@ -122,6 +123,14 @@ between the address and the port.
 The destination port may be a portname listed in
 .Xr services 5
 or a numeric port.
+.It Fl e Ar http[s]://host:port
+Specify
+.Ar host
+and
+.Ar port
+to send flow information to a elasticsearch node.
+Flow data will be saved in index softflowd.
+Document type is softflow.
 .It Fl i Xo
 .Sm off
 .Oo Ar if_ndx : Oc
