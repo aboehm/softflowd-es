@@ -56,7 +56,7 @@ AC_ARG_WITH(chrootdir,
 )
 
 AC_ARG_ENABLE(elasticsearch,
-	[AS_HELP_STRING([--enable-elasticsearch],[Enable elasticsearch output module @<:@default=no@:>@])],
+	[AS_HELP_STRING([--enable-elasticsearch],[Enable elasticsearch logging target (requires libcurl) @<:@default=no@:>@])],
 	[case "${enableval}" in
 		yes) enable_elasticsearch="yes" ;;
 		no) enable_elasticsearch="no" ;;
