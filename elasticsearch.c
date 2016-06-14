@@ -33,6 +33,21 @@ int verbose_flag;
 
 /* Format a time */
 static const char *
+index_from_timestamp(struct timeval* t, const char* index_prefix)
+{
+	struct tm *tm;
+	char buf[32];
+	static char ret[256];
+
+	tm = gmtime(&t->tv_sec);
+	strftime(buf, sizeof(buf), "%Y.%m.%d", tm);
+	snprintf(ret, sizeof(ret), "%s-%s", index_prefix, buf);
+
+	return (ret);
+}
+
+/* Format a time */
+static const char *
 format_time_usec(struct timeval* t)
 {
 	struct tm *tm;
@@ -169,7 +184,7 @@ format_flow_es_bulk(struct FLOW *flow, int expired, const char* es_index, const 
 		", \"expired\": %s "
 		", \"protocol_family\": \"%s\" "
 		"}",
-		es_index, es_doc_type, flow_uid(flow, 1, &now),
+		index_from_timestamp(&now, es_index), es_doc_type, flow_uid(flow, 1, &now),
 		format_time_usec(&now),
 		flow->flow_seq,
 		addr1, ntohs(flow->port[0]), addr1, ntohs(flow->port[0]),

@@ -1590,7 +1590,7 @@ usage(void)
 "  -m max_flows            Specify maximum number of flows to track (default %d)\n"
 "  -n host:port            Send Cisco NetFlow(tm)-compatible packets to host:port\n"
 #ifdef USE_ELASTICSEARCH
-"  -e URL                  Send flows to elasticsearch node (index softflowd, type softflow)\n"
+"  -e URL                  Send flows to elasticsearch node (index softflowd-YYYY.MM.DD, type softflow)\n"
 #endif
 "  -p pidfile              Record pid in specified file\n"
 "                          (default: %s)\n"
